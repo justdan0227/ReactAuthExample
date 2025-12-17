@@ -107,17 +107,23 @@ The project includes a utility script (`scripts.sh`) for common operations:
 # Make script executable (first time only)
 chmod +x scripts.sh
 
+# Show help and available commands
+./scripts.sh --help
+
+# Show current version
+./scripts.sh --show
+
 # Start Metro bundler
-./scripts.sh metro
+./scripts.sh --metro
 
-# Run iOS app
-./scripts.sh ios
+# Run iOS app in simulator
+./scripts.sh --ios_sim
 
-# Run Android app
-./scripts.sh android
+# Run Android app in emulator
+./scripts.sh --android_sim
 
 # Update version across all platforms
-./scripts.sh update-version 1.0.1 2
+./scripts.sh --update-version 1.0.1 2
 ```
 
 ### Manual Commands
@@ -144,7 +150,7 @@ npx react-native run-android
 
 ### Version Management Workflow
 When updating app version:
-1. Run the update script: `./scripts.sh update-version <new_version> <new_build>`
+1. Run the update script: `./scripts.sh --update-version <new_version> <new_build>`
 2. Script automatically updates:
    - version.json
    - package.json
@@ -195,7 +201,7 @@ Potential areas for expansion:
 
 ### Version Sync Issues
 If versions get out of sync:
-1. Run `./scripts.sh update-version <current_version> <current_build>`
+1. Run `./scripts.sh --update-version <current_version> <current_build>`
 2. Clean and rebuild both platforms
 3. Verify version.json contains correct values
 
