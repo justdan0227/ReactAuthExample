@@ -31,12 +31,13 @@ const API_BASE_URL = 'http://localhost:8888/reactauth-api/api';
 const API_ENDPOINTS = {
   login: `${API_BASE_URL}/login.php`,
   register: `${API_BASE_URL}/register.php`,
+  profile: `${API_BASE_URL}/profile.php`,
   test: `${API_BASE_URL}/test.php`
 };
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
-  const [currentScreen, setCurrentScreen] = useState('welcome'); // 'welcome' or 'login'
+  const [currentScreen, setCurrentScreen] = useState('welcome'); // 'welcome', 'login', or 'dashboard'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -44,17 +45,54 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [tokenExpiration, setTokenExpiration] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [profileData, setProfileData] = useState(null);
 
-  // Load cached email on component mount
+  // Helper function for authenticated API calls
+  const makeAuthenticatedRequest = async (endpoint, options = {}) => {
+    if (!authToken) {
+      throw new Error('No authentication token available');
+    }
+    
+    // Check if token is expired
+    if (tokenExpiration && Date.now() >= tokenExpiration) {
+      await clearAuthData();
+      Alert.alert('Session Expired', 'Please login again.');
+      setCurrentScreen('welcome');
+      throw new Error('Token expired');
+    }
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
+      ...options.headers
+    };
+    
+    const response = await fetch(endpoint, {
+      ...options,
+      headers
+    });
+    
+    if (response.status === 401) {
+      // Token invalid or expired
+      await clearAuthData();
+      Alert.alert('Authentication Error', 'Please login again.');
+      setCurrentScreen('welcome');
+      throw new Error('Authentication failed');
+    }
+    
+    return response;
+  };
+
+  // Load cached data on component mount
   useEffect(() => {
-    loadCachedEmail();
+    loadCachedData();
   }, []);
 
-  const loadCachedEmail = async () => {
+  const loadCachedData = async () => {
     try {
-      console.log('loadCachedEmail: Starting...');
-      console.log('AsyncStorage available:', !!AsyncStorage);
+      console.log('loadCachedData: Starting...');
       
       // Check if AsyncStorage is available
       if (!AsyncStorage) {
@@ -62,17 +100,86 @@ function App() {
         return;
       }
       
+      // Load cached email
       const cachedEmail = await AsyncStorage.getItem('userEmail');
-      console.log('loadCachedEmail: Retrieved from cache:', cachedEmail);
+      console.log('loadCachedData: Retrieved email from cache:', cachedEmail);
       
       if (cachedEmail) {
         setEmail(cachedEmail);
-        console.log('loadCachedEmail: Email set to:', cachedEmail);
-      } else {
-        console.log('loadCachedEmail: No cached email found');
+        console.log('loadCachedData: Email set to:', cachedEmail);
+      }
+      
+      // Load cached JWT token
+      const cachedToken = await AsyncStorage.getItem('authToken');
+      const cachedUser = await AsyncStorage.getItem('userData');
+      const cachedExpiration = await AsyncStorage.getItem('tokenExpiration');
+      
+      console.log('loadCachedData: Token found:', !!cachedToken);
+      console.log('loadCachedData: User data found:', !!cachedUser);
+      
+      if (cachedToken && cachedUser && cachedExpiration) {
+        const expTime = parseInt(cachedExpiration);
+        const now = Date.now();
+        
+        if (now < expTime) {
+          // Token is still valid
+          setAuthToken(cachedToken);
+          setUser(JSON.parse(cachedUser));
+          setTokenExpiration(expTime);
+          setCurrentScreen('dashboard'); // Auto-navigate to dashboard
+          console.log('loadCachedData: Valid token restored, navigating to dashboard, expires:', new Date(expTime));
+        } else {
+          // Token expired, clear it
+          console.log('loadCachedData: Token expired, clearing cache');
+          await clearAuthData();
+        }
       }
     } catch (error) {
-      console.log('Error loading cached email:', error);
+      console.log('Error loading cached data:', error);
+    }
+  };
+
+  const saveAuthData = async (token, userData, expiresIn) => {
+    try {
+      if (!AsyncStorage) {
+        console.log('AsyncStorage not available for saving auth data');
+        return;
+      }
+      
+      console.log('saveAuthData: expiresIn received:', expiresIn); // Debug line
+      const expirationTime = Date.now() + (expiresIn * 1000);
+      console.log('saveAuthData: calculated expiration time:', new Date(expirationTime)); // Debug line
+      
+      await AsyncStorage.setItem('authToken', token);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      await AsyncStorage.setItem('tokenExpiration', expirationTime.toString());
+      
+      setAuthToken(token);
+      setUser(userData);
+      setTokenExpiration(expirationTime);
+      
+      console.log('saveAuthData: Auth data saved, expires:', new Date(expirationTime));
+    } catch (error) {
+      console.log('Error saving auth data:', error);
+    }
+  };
+
+  const clearAuthData = async () => {
+    try {
+      if (!AsyncStorage) {
+        console.log('AsyncStorage not available for clearing auth data');
+        return;
+      }
+      
+      await AsyncStorage.multiRemove(['authToken', 'userData', 'tokenExpiration']);
+      
+      setAuthToken(null);
+      setUser(null);
+      setTokenExpiration(null);
+      
+      console.log('clearAuthData: Auth data cleared');
+    } catch (error) {
+      console.log('Error clearing auth data:', error);
     }
   };
 
@@ -178,9 +285,17 @@ function App() {
           // Login successful
           setUser(data.user);
           setAuthToken(data.token);
-                    // Save email for future logins
+          
+          // Save auth data for persistence across app restarts
+          await saveAuthData(data.token, data.user, data.expires_in);
+          
+          // Save email for future logins
           await saveCachedEmail(email.trim());
-                    Alert.alert(
+          
+          // Navigate to dashboard
+          setCurrentScreen('dashboard');
+                    
+          Alert.alert(
             'Login Successful!',
             `Welcome back, ${data.user.first_name}!\n\nUser ID: ${data.user.id}\nEmail: ${data.user.email}`,
             [{ text: 'OK', style: 'default' }]
@@ -222,6 +337,45 @@ function App() {
     setCurrentScreen('welcome');
   };
 
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            await clearAuthData();
+            setCurrentScreen('welcome');
+            setProfileData(null);
+            Alert.alert('Logged Out', 'You have been logged out successfully.');
+          }
+        }
+      ]
+    );
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true);
+      const response = await makeAuthenticatedRequest(API_ENDPOINTS.profile);
+      const data = await response.json();
+      
+      if (data.success) {
+        setProfileData(data);
+      } else {
+        Alert.alert('Error', 'Failed to fetch profile data');
+      }
+    } catch (error) {
+      console.log('Error fetching profile:', error);
+      Alert.alert('Error', 'Failed to fetch profile data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const backgroundStyle = {
     backgroundColor: isDarkMode ? '#1a1a1a' : '#ffffff',
     flex: 1,
@@ -231,6 +385,76 @@ function App() {
   const subtextColor = isDarkMode ? '#cccccc' : '#666666';
   const inputBackgroundColor = isDarkMode ? '#2a2a2a' : '#f5f5f5';
   const inputBorderColor = isDarkMode ? '#444444' : '#dddddd';
+
+  // Dashboard Screen (authenticated)
+  if (currentScreen === 'dashboard' && authToken) {
+    return (
+      <SafeAreaView style={backgroundStyle}>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor={backgroundStyle.backgroundColor}
+        />
+        <View style={[styles.container, backgroundStyle]}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: textColor }]}>
+              Dashboard
+            </Text>
+            <Text style={[styles.subtitle, { color: subtextColor }]}>
+              Welcome, {user?.first_name || 'User'}!
+            </Text>
+          </View>
+          
+          <View style={styles.content}>
+            <View style={styles.userInfo}>
+              <Text style={[styles.infoTitle, { color: textColor }]}>User Information:</Text>
+              <Text style={[styles.infoText, { color: subtextColor }]}>
+                Email: {user?.email}
+              </Text>
+              <Text style={[styles.infoText, { color: subtextColor }]}>
+                Name: {user?.first_name} {user?.last_name}
+              </Text>
+              <Text style={[styles.infoText, { color: subtextColor }]}>
+                Token expires: {tokenExpiration ? new Date(tokenExpiration).toLocaleTimeString() : 'Unknown'}
+              </Text>
+            </View>
+
+            {profileData && (
+              <View style={styles.profileInfo}>
+                <Text style={[styles.infoTitle, { color: textColor }]}>Profile Data:</Text>
+                <Text style={[styles.infoText, { color: subtextColor }]}>
+                  Last Login: {profileData.user?.last_login || 'N/A'}
+                </Text>
+                <Text style={[styles.infoText, { color: subtextColor }]}>
+                  Account Created: {profileData.user?.created_at || 'N/A'}
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.button, styles.primaryButton]}
+              onPress={fetchUserProfile}
+              activeOpacity={0.8}
+              disabled={isLoading}
+            >
+              <Text style={styles.buttonText}>
+                {isLoading ? 'LOADING...' : 'FETCH PROFILE'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.button, styles.secondaryButton]}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.buttonText, styles.secondaryButtonText]}>LOGOUT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Welcome Screen
   if (currentScreen === 'welcome') {
@@ -551,6 +775,32 @@ const styles = StyleSheet.create({
   },
   eyeIconText: {
     fontSize: 20,
+  },
+  userInfo: {
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
+  },
+  profileInfo: {
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(76, 217, 100, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 217, 100, 0.3)',
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  infoText: {
+    fontSize: 16,
+    marginBottom: 5,
+    lineHeight: 22,
   },
 });
 

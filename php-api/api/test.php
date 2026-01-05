@@ -33,7 +33,8 @@ echo json_encode([
     'message' => 'ReactAuthExample API is working!',
     'version' => API_VERSION,
     'timestamp' => date('Y-m-d H:i:s'),
-    'debug_mode' => API_DEBUG
+    'debug_mode' => API_DEBUG,
+    'jwt_expiration' => JWT_EXPIRATION
 ]);
 
 /**

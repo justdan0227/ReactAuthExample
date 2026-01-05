@@ -1,50 +1,115 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ReactAuthExample
 
-# Getting Started
+A complete React Native CLI application demonstrating **JWT authentication** with secure token persistence, automatic login, and protected API endpoints.
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+## 🚀 Features
 
-## Step 1: Start the Metro Server
+- **JWT Authentication System** with custom PHP backend
+- **Automatic Login** - tokens persist across app restarts
+- **Protected API Endpoints** with middleware validation
+- **Secure Token Expiration** handling
+- **Dashboard UI** with user information display
+- **Email Caching** for improved UX
+- **Password Visibility Toggle**
+- **Real-time Token Status** display
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+## 📱 Architecture
 
-To start Metro, run the following command from the _root_ of your React Native project:
+- **Frontend**: React Native 0.73.6 with AsyncStorage for token persistence
+- **Backend**: PHP/MySQL with custom JWT implementation
+- **Server**: MAMP (Apache/MySQL)
+- **Security**: bcrypt password hashing + JWT tokens with configurable expiration
+
+## 🔧 Setup Instructions
+
+### Prerequisites
+- React Native CLI environment setup
+- MAMP server installed
+- iPhone/Android simulator
+
+### Backend Setup (MAMP)
+1. **Start MAMP** with document root: `/Users/d0k08gm/Projects/mamp`
+2. **Copy API files**: `cp -r php-api /Users/d0k08gm/Projects/mamp/reactauth-api`
+3. **Create database**: Import `php-api/database/schema.sql` into `reactauth_example` database
+4. **Test API**: Visit `http://localhost:8888/reactauth-api/api/test.php`
+
+### React Native Setup
+
+### React Native Setup
+
+## Step 1: Install Dependencies
 
 ```bash
-# using npm
+npm install
+# Ensure AsyncStorage is linked properly
+```
+
+## Step 2: Start the Metro Server
+
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Start your Application
-
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
-
-```bash
-# using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
+## Step 3: Run the Application
 
 ### For iOS
-
 ```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+npx react-native run-ios
 ```
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+### For Android  
+```bash
+npx react-native run-android
+```
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+## 🔐 Authentication Flow
+
+1. **Welcome Screen** → Login form with cached email
+2. **Login** → JWT token generated (currently **30 seconds** expiration)  
+3. **Dashboard** → Shows user info, token status, logout option
+4. **Auto-Login** → Valid tokens automatically restore session
+5. **Expiration** → Expired tokens redirect to login
+
+## 🛠️ JWT Configuration
+
+**To change token expiration time:**
+
+1. Edit [`php-api/api/login.php`](php-api/api/login.php):
+   ```php
+   $token = $jwt->encode($tokenPayload, 30); // Change 30 to desired seconds
+   'expires_in' => 30, // Update response value too
+   ```
+
+2. Copy to MAMP server:
+   ```bash
+   cp php-api/api/login.php /Users/d0k08gm/Projects/mamp/reactauth-api/api/login.php
+   ```
+
+## 📋 API Endpoints
+
+- `POST /api/login.php` - User authentication (returns JWT)
+- `POST /api/register.php` - User registration  
+- `GET /api/profile.php` - Protected endpoint (requires JWT)
+- `GET /api/test.php` - API health check
+
+## 🧪 Testing
+
+**Test Token Expiration:**
+1. Login to app → Note dashboard token expiration time
+2. Wait for expiration → Restart app → Should show login screen
+3. Login again within expiration window → Restart app → Should show dashboard
+
+## 📱 Current Status
+
+✅ **Complete JWT authentication system**  
+✅ **Token persistence across app restarts**  
+✅ **Automatic expiration handling**  
+✅ **Protected API endpoints working**  
+✅ **Dashboard UI with user information**  
+
+**Token Expiration**: Currently set to **30 seconds** for testing
+
+---
 
 ## Step 3: Modifying your App
 

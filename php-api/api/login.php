@@ -1,7 +1,7 @@
 <?php
 /**
  * Authentication API for ReactAuthExample
- * Handles user login and validation
+ * Handles user login and JWT token generation
  */
 
 header('Content-Type: application/json');
@@ -9,6 +9,7 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 require_once '../config/database.php';
+require_once '../config/jwt.php';
 
 // Handle CORS preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -79,6 +80,19 @@ try {
     $updateStmt = $db->prepare($updateQuery);
     $updateStmt->execute([$user['id']]);
 
+    // Generate JWT token
+    $jwt = new SimpleJWT(JWT_SECRET);
+    $tokenPayload = [
+        'user_id' => $user['id'],
+        'email' => $user['email'],
+        'first_name' => $user['first_name'],
+        'last_name' => $user['last_name'],
+        'iss' => 'ReactAuthExample', // issuer
+        'aud' => 'ReactAuthExample-App' // audience
+    ];
+    
+    $token = $jwt->encode($tokenPayload, 30); // 30 seconds
+
     // Return success response (without password hash)
     unset($user['password_hash']);
     
@@ -87,7 +101,9 @@ try {
         'success' => true,
         'message' => 'Login successful',
         'user' => $user,
-        'token' => generateSimpleToken($user['id']) // Simple token for now
+        'token' => $token,
+        'expires_in' => 30, // 30 seconds
+        'token_type' => 'Bearer'
     ]);
 
 } catch (Exception $e) {
@@ -111,12 +127,5 @@ function setCorsHeaders() {
     
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Max-Age: 86400');
-}
-
-/**
- * Generate simple token (replace with JWT in production)
- */
-function generateSimpleToken($userId) {
-    return base64_encode($userId . ':' . time() . ':' . JWT_SECRET);
 }
 ?>
