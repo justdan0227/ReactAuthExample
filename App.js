@@ -32,7 +32,9 @@ const API_ENDPOINTS = {
   login: `${API_BASE_URL}/login.php`,
   register: `${API_BASE_URL}/register.php`,
   profile: `${API_BASE_URL}/profile.php`,
-  test: `${API_BASE_URL}/test.php`
+  test: `${API_BASE_URL}/test.php`,
+  refresh: `${API_BASE_URL}/refresh.php`,
+  logout: `${API_BASE_URL}/logout.php`
 };
 
 function App() {
@@ -45,22 +47,31 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(null);
   const [tokenExpiration, setTokenExpiration] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [profileData, setProfileData] = useState(null);
 
   // Helper function for authenticated API calls
   const makeAuthenticatedRequest = async (endpoint, options = {}) => {
+    // First check if we have an access token
     if (!authToken) {
       throw new Error('No authentication token available');
     }
     
-    // Check if token is expired
+    // Check if access token is expired
     if (tokenExpiration && Date.now() >= tokenExpiration) {
-      await clearAuthData();
-      Alert.alert('Session Expired', 'Please login again.');
-      setCurrentScreen('welcome');
-      throw new Error('Token expired');
+      console.log('Access token expired, attempting refresh...');
+      
+      // Try to refresh the token
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        // Refresh failed, clear auth and redirect to login
+        await clearAuthData();
+        Alert.alert('Session Expired', 'Please login again.');
+        setCurrentScreen('welcome');
+        throw new Error('Token refresh failed');
+      }
     }
     
     const headers = {
@@ -75,14 +86,74 @@ function App() {
     });
     
     if (response.status === 401) {
-      // Token invalid or expired
-      await clearAuthData();
-      Alert.alert('Authentication Error', 'Please login again.');
-      setCurrentScreen('welcome');
-      throw new Error('Authentication failed');
+      // Access token might be invalid, try to refresh
+      console.log('API returned 401, attempting token refresh...');
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        // Retry the original request with new token
+        return fetch(endpoint, {
+          ...options,
+          headers: {
+            ...headers,
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+      } else {
+        // Refresh failed, clear auth and redirect to login
+        await clearAuthData();
+        Alert.alert('Authentication Error', 'Please login again.');
+        setCurrentScreen('welcome');
+        throw new Error('Authentication failed');
+      }
     }
     
     return response;
+  };
+
+  // Function to refresh access token using refresh token
+  const refreshAccessToken = async () => {
+    try {
+      if (!refreshToken) {
+        console.log('No refresh token available');
+        return false;
+      }
+      
+      console.log('Attempting to refresh access token...');
+      
+      const response = await fetch(API_ENDPOINTS.refresh, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.access_token) {
+        console.log('Access token refreshed successfully');
+        
+        // Update the access token and expiration
+        const newExpiration = Date.now() + (data.expires_in * 1000);
+        setAuthToken(data.access_token);
+        setTokenExpiration(newExpiration);
+        
+        // Update stored auth data
+        await AsyncStorage.setItem('authToken', data.access_token);
+        await AsyncStorage.setItem('tokenExpiration', newExpiration.toString());
+        
+        console.log('New access token saved, expires:', new Date(newExpiration));
+        return true;
+      } else {
+        console.log('Token refresh failed:', data.error || 'Unknown error');
+        return false;
+      }
+    } catch (error) {
+      console.log('Token refresh error:', error);
+      return false;
+    }
   };
 
   // Load cached data on component mount
@@ -109,46 +180,92 @@ function App() {
         console.log('loadCachedData: Email set to:', cachedEmail);
       }
       
-      // Load cached JWT token
-      const cachedToken = await AsyncStorage.getItem('authToken');
+      // Load cached tokens and user data
+      const cachedAccessToken = await AsyncStorage.getItem('authToken');
+      const cachedRefreshToken = await AsyncStorage.getItem('refreshToken');
       const cachedUser = await AsyncStorage.getItem('userData');
       const cachedExpiration = await AsyncStorage.getItem('tokenExpiration');
       
-      console.log('loadCachedData: Token found:', !!cachedToken);
+      console.log('loadCachedData: Access token found:', !!cachedAccessToken);
+      console.log('loadCachedData: Refresh token found:', !!cachedRefreshToken);
       console.log('loadCachedData: User data found:', !!cachedUser);
       
-      if (cachedToken && cachedUser && cachedExpiration) {
-        const expTime = parseInt(cachedExpiration);
-        const now = Date.now();
+      if (cachedRefreshToken && cachedUser) {
+        // We have a refresh token and user data
+        setRefreshToken(cachedRefreshToken);
+        setUser(JSON.parse(cachedUser));
         
-        if (now < expTime) {
-          // Token is still valid
-          setAuthToken(cachedToken);
-          setUser(JSON.parse(cachedUser));
-          setTokenExpiration(expTime);
-          setCurrentScreen('dashboard'); // Auto-navigate to dashboard
-          console.log('loadCachedData: Valid token restored, navigating to dashboard, expires:', new Date(expTime));
-        } else {
-          // Token expired, clear it
-          console.log('loadCachedData: Token expired, clearing cache');
-          await clearAuthData();
+        if (cachedAccessToken && cachedExpiration) {
+          const expTime = parseInt(cachedExpiration);
+          const now = Date.now();
+          
+          if (now < expTime) {
+            // Access token is still valid
+            setAuthToken(cachedAccessToken);
+            setTokenExpiration(expTime);
+            setCurrentScreen('dashboard');
+            console.log('loadCachedData: Valid access token restored, expires:', new Date(expTime));
+            return;
+          } else {
+            console.log('loadCachedData: Access token expired, will try refresh on first API call');
+          }
         }
+        
+        // Access token is expired or missing, but we have refresh token
+        // Navigate to dashboard and let the refresh happen on first API call
+        setCurrentScreen('dashboard');
+        console.log('loadCachedData: Refresh token restored, will refresh access token on demand');
+        
+      } else {
+        // No valid tokens, user needs to login
+        console.log('loadCachedData: No valid tokens found');
       }
     } catch (error) {
       console.log('Error loading cached data:', error);
     }
   };
 
-  const saveAuthData = async (token, userData, expiresIn) => {
+  const saveAuthData = async (accessToken, refreshTokenValue, userData, expiresIn) => {
     try {
       if (!AsyncStorage) {
         console.log('AsyncStorage not available for saving auth data');
         return;
       }
       
-      console.log('saveAuthData: expiresIn received:', expiresIn); // Debug line
+      console.log('saveAuthData: expiresIn received:', expiresIn);
       const expirationTime = Date.now() + (expiresIn * 1000);
-      console.log('saveAuthData: calculated expiration time:', new Date(expirationTime)); // Debug line
+      console.log('saveAuthData: calculated expiration time:', new Date(expirationTime));
+      
+      await AsyncStorage.setItem('authToken', accessToken);
+      if (refreshTokenValue) {
+        await AsyncStorage.setItem('refreshToken', refreshTokenValue);
+      }
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      await AsyncStorage.setItem('tokenExpiration', expirationTime.toString());
+      
+      setAuthToken(accessToken);
+      if (refreshTokenValue) {
+        setRefreshToken(refreshTokenValue);
+      }
+      setUser(userData);
+      setTokenExpiration(expirationTime);
+      
+      console.log('saveAuthData: Auth data saved, access token expires:', new Date(expirationTime));
+    } catch (error) {
+      console.log('Error saving auth data:', error);
+    }
+  };
+
+  const saveAuthDataLegacy = async (token, userData, expiresIn) => {
+    try {
+      if (!AsyncStorage) {
+        console.log('AsyncStorage not available for saving auth data');
+        return;
+      }
+      
+      console.log('saveAuthDataLegacy: expiresIn received:', expiresIn);
+      const expirationTime = Date.now() + (expiresIn * 1000);
+      console.log('saveAuthDataLegacy: calculated expiration time:', new Date(expirationTime));
       
       await AsyncStorage.setItem('authToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
@@ -158,7 +275,7 @@ function App() {
       setUser(userData);
       setTokenExpiration(expirationTime);
       
-      console.log('saveAuthData: Auth data saved, expires:', new Date(expirationTime));
+      console.log('saveAuthDataLegacy: Auth data saved, expires:', new Date(expirationTime));
     } catch (error) {
       console.log('Error saving auth data:', error);
     }
@@ -171,9 +288,10 @@ function App() {
         return;
       }
       
-      await AsyncStorage.multiRemove(['authToken', 'userData', 'tokenExpiration']);
+      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData', 'tokenExpiration']);
       
       setAuthToken(null);
+      setRefreshToken(null);
       setUser(null);
       setTokenExpiration(null);
       
@@ -279,15 +397,52 @@ function App() {
           }),
         });
 
-        const data = await response.json();
+        // Debug: Log response details
+        console.log('Login response status:', response.status);
+        console.log('Login response headers:', response.headers);
+        
+        // Get the raw response text first
+        const responseText = await response.text();
+        console.log('Login raw response text:', responseText);
+        
+        // Try to parse as JSON
+        let data;
+        try {
+          data = JSON.parse(responseText);
+          console.log('Login parsed JSON:', data);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.log('Failed to parse this text as JSON:', responseText);
+          Alert.alert(
+            'Server Error',
+            'Server returned invalid response. Please check server configuration.',
+            [{ text: 'OK', style: 'default' }]
+          );
+          return;
+        }
 
         if (data.success) {
-          // Login successful
-          setUser(data.user);
-          setAuthToken(data.token);
+          // Login successful - check what tokens we got
+          console.log('Login successful - checking tokens...');
+          console.log('Has access_token:', !!data.access_token);
+          console.log('Has refresh_token:', !!data.refresh_token);
+          console.log('Has legacy token:', !!data.token);
           
-          // Save auth data for persistence across app restarts
-          await saveAuthData(data.token, data.user, data.expires_in);
+          setUser(data.user);
+          
+          // Use access_token if available, fall back to token
+          const accessToken = data.access_token || data.token;
+          const refreshTokenValue = data.refresh_token;
+          
+          if (refreshTokenValue) {
+            console.log('Using new refresh token system');
+            // Save both tokens
+            await saveAuthData(accessToken, refreshTokenValue, data.user, data.expires_in);
+          } else {
+            console.log('Using legacy single token system');
+            // Save single token only
+            await saveAuthDataLegacy(accessToken, data.user, data.expires_in);
+          }
           
           // Save email for future logins
           await saveCachedEmail(email.trim());
@@ -347,6 +502,26 @@ function App() {
           text: 'Logout', 
           style: 'destructive',
           onPress: async () => {
+            // Call logout API to revoke refresh token
+            if (refreshToken) {
+              try {
+                await fetch(API_ENDPOINTS.logout, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    refresh_token: refreshToken,
+                  }),
+                });
+                console.log('Refresh token revoked on server');
+              } catch (error) {
+                console.log('Error revoking token on server:', error);
+                // Continue with local logout even if server logout fails
+              }
+            }
+            
+            // Clear local auth data
             await clearAuthData();
             setCurrentScreen('welcome');
             setProfileData(null);

@@ -5,13 +5,16 @@ A complete React Native CLI application demonstrating **JWT authentication** wit
 ## 🚀 Features
 
 - **JWT Authentication System** with custom PHP backend
+- **Refresh Token Support** - 7-day seamless sessions with automatic token refresh
 - **Automatic Login** - tokens persist across app restarts
 - **Protected API Endpoints** with middleware validation
-- **Secure Token Expiration** handling
+- **Secure Token Expiration** handling (1-hour access tokens, 7-day refresh tokens)
+- **Database-Stored Refresh Tokens** with revocation support
 - **Dashboard UI** with user information display
 - **Email Caching** for improved UX
 - **Password Visibility Toggle**
 - **Real-time Token Status** display
+- **Secure Logout** with server-side token revocation
 
 ## 📱 Architecture
 
@@ -65,19 +68,23 @@ npx react-native run-android
 ## 🔐 Authentication Flow
 
 1. **Welcome Screen** → Login form with cached email
-2. **Login** → JWT token generated (currently **30 seconds** expiration)  
+2. **Login** → Get 1-hour access token + 7-day refresh token  
 3. **Dashboard** → Shows user info, token status, logout option
-4. **Auto-Login** → Valid tokens automatically restore session
-5. **Expiration** → Expired tokens redirect to login
+4. **Auto-Refresh** → Access tokens automatically refresh using refresh token
+5. **Seamless Experience** → 7 days of uninterrupted access
+6. **After 7 days** → Refresh token expires, user must login again
+7. **Logout** → Both tokens cleared locally and refresh token revoked on server
 
 ## 🛠️ JWT Configuration
 
-**To change token expiration time:**
+**To change token expiration times:**
 
 1. Edit [`php-api/api/login.php`](php-api/api/login.php):
    ```php
-   $token = $jwt->encode($tokenPayload, 30); // Change 30 to desired seconds
-   'expires_in' => 30, // Update response value too
+   $accessToken = $jwt->encode($tokenPayload, 3600); // Change 3600 to desired seconds (access token)
+   $refreshToken = $jwt->encode($refreshTokenPayload, 604800); // Change 604800 to desired seconds (refresh token)
+   'expires_in' => 3600, // Update response value for access token
+   'refresh_expires_in' => 604800, // Update response value for refresh token
    ```
 
 2. Copy to MAMP server:
@@ -85,11 +92,17 @@ npx react-native run-android
    cp php-api/api/login.php /Users/d0k08gm/Projects/mamp/reactauth-api/api/login.php
    ```
 
+**Current Settings:**
+- **Access Token**: 1 hour (3600 seconds)
+- **Refresh Token**: 7 days (604800 seconds)
+
 ## 📋 API Endpoints
 
-- `POST /api/login.php` - User authentication (returns JWT)
+- `POST /api/login.php` - User authentication (returns access + refresh tokens)
 - `POST /api/register.php` - User registration  
 - `GET /api/profile.php` - Protected endpoint (requires JWT)
+- `POST /api/refresh.php` - Exchange refresh token for new access token
+- `POST /api/logout.php` - Revoke refresh tokens (logout from device/all devices)
 - `GET /api/test.php` - API health check
 
 ## 🧪 Testing
@@ -101,13 +114,15 @@ npx react-native run-android
 
 ## 📱 Current Status
 
-✅ **Complete JWT authentication system**  
+✅ **Complete JWT authentication with refresh token system**  
+✅ **7-day seamless sessions with automatic token refresh**  
 ✅ **Token persistence across app restarts**  
-✅ **Automatic expiration handling**  
+✅ **Database-stored refresh tokens with revocation**  
 ✅ **Protected API endpoints working**  
 ✅ **Dashboard UI with user information**  
+✅ **Secure logout with server-side token cleanup**
 
-**Token Expiration**: Currently set to **30 seconds** for testing
+**Token System**: 1-hour access tokens + 7-day refresh tokens
 
 ---
 

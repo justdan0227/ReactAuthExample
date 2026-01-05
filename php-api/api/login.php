@@ -8,6 +8,7 @@ header('Content-Type: application/json');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+require_once '../config/config.php';
 require_once '../config/database.php';
 require_once '../config/jwt.php';
 
@@ -91,20 +92,51 @@ try {
         'aud' => 'ReactAuthExample-App' // audience
     ];
     
-    $token = $jwt->encode($tokenPayload, 30); // 30 seconds
+    // Generate access token (1 hour)
+    $accessToken = $jwt->encode($tokenPayload, 3600);
+    
+    // Generate refresh token (7 days = 604800 seconds)
+    $refreshTokenPayload = [
+        'user_id' => $user['id'],
+        'type' => 'refresh',
+        'iss' => 'ReactAuthExample',
+        'aud' => 'ReactAuthExample-App'
+    ];
+    $refreshToken = $jwt->encode($refreshTokenPayload, 604800);
+    
+    // Try to store refresh token in database
+    $refreshTokenStored = false;
+    try {
+        $refreshExpiresAt = date('Y-m-d H:i:s', time() + 604800); // 7 days from now
+        $stmt = $db->prepare("INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)");
+        $stmt->execute([$user['id'], $refreshToken, $refreshExpiresAt]);
+        $refreshTokenStored = true;
+    } catch (Exception $e) {
+        // Log error but continue - we'll send access token only
+        error_log("Failed to store refresh token: " . $e->getMessage());
+    }
 
     // Return success response (without password hash)
     unset($user['password_hash']);
     
     http_response_code(200);
-    echo json_encode([
+    $response = [
         'success' => true,
         'message' => 'Login successful',
         'user' => $user,
-        'token' => $token,
-        'expires_in' => 30, // 30 seconds
+        'access_token' => $accessToken,
+        'token' => $accessToken, // Keep backward compatibility
+        'expires_in' => 3600,
         'token_type' => 'Bearer'
-    ]);
+    ];
+    
+    // Only include refresh token if successfully stored
+    if ($refreshTokenStored) {
+        $response['refresh_token'] = $refreshToken;
+        $response['refresh_expires_in'] = 604800;
+    }
+    
+    echo json_encode($response);
 
 } catch (Exception $e) {
     http_response_code(500);
