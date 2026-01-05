@@ -5,7 +5,7 @@
  * @format
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -20,6 +20,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import version from configuration files
 const packageJson = require('./package.json');
@@ -43,6 +44,54 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Load cached email on component mount
+  useEffect(() => {
+    loadCachedEmail();
+  }, []);
+
+  const loadCachedEmail = async () => {
+    try {
+      console.log('loadCachedEmail: Starting...');
+      console.log('AsyncStorage available:', !!AsyncStorage);
+      
+      // Check if AsyncStorage is available
+      if (!AsyncStorage) {
+        console.log('AsyncStorage not available');
+        return;
+      }
+      
+      const cachedEmail = await AsyncStorage.getItem('userEmail');
+      console.log('loadCachedEmail: Retrieved from cache:', cachedEmail);
+      
+      if (cachedEmail) {
+        setEmail(cachedEmail);
+        console.log('loadCachedEmail: Email set to:', cachedEmail);
+      } else {
+        console.log('loadCachedEmail: No cached email found');
+      }
+    } catch (error) {
+      console.log('Error loading cached email:', error);
+    }
+  };
+
+  const saveCachedEmail = async (emailToSave) => {
+    try {
+      console.log('saveCachedEmail: Saving email:', emailToSave);
+      
+      // Check if AsyncStorage is available
+      if (!AsyncStorage) {
+        console.log('AsyncStorage not available for saving');
+        return;
+      }
+      
+      await AsyncStorage.setItem('userEmail', emailToSave);
+      console.log('saveCachedEmail: Email saved successfully');
+    } catch (error) {
+      console.log('Error saving email:', error);
+    }
+  };
 
   // Email validation function
   const validateEmail = (email) => {
@@ -129,15 +178,15 @@ function App() {
           // Login successful
           setUser(data.user);
           setAuthToken(data.token);
-          
-          Alert.alert(
+                    // Save email for future logins
+          await saveCachedEmail(email.trim());
+                    Alert.alert(
             'Login Successful!',
             `Welcome back, ${data.user.first_name}!\n\nUser ID: ${data.user.id}\nEmail: ${data.user.email}`,
             [{ text: 'OK', style: 'default' }]
           );
           
-          // Clear the form
-          setEmail('');
+          // Clear only the password, keep email cached
           setPassword('');
         } else {
           // API returned an error
@@ -163,8 +212,7 @@ function App() {
 
   const navigateToLogin = () => {
     setCurrentScreen('login');
-    // Reset form when navigating
-    setEmail('');
+    // Reset only password and errors, keep cached email
     setPassword('');
     setEmailError('');
     setPasswordError('');
@@ -277,6 +325,10 @@ function App() {
                 onChangeText={(text) => {
                   setEmail(text);
                   if (emailError) setEmailError(''); // Clear error when user types
+                  // Save email as user types (debounced by React's setState)
+                  if (text.trim()) {
+                    saveCachedEmail(text.trim());
+                  }
                 }}
                 placeholder="Enter your email"
                 placeholderTextColor={subtextColor}
@@ -289,26 +341,39 @@ function App() {
 
             <View style={styles.inputContainer}>
               <Text style={[styles.inputLabel, { color: textColor }]}>Password</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  { 
-                    backgroundColor: inputBackgroundColor,
-                    borderColor: passwordError ? '#ff4444' : inputBorderColor,
-                    color: textColor
-                  }
-                ]}
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (passwordError) setPasswordError(''); // Clear error when user types
-                }}
-                placeholder="Enter your password"
-                placeholderTextColor={subtextColor}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <View style={[
+                styles.passwordInputContainer,
+                { 
+                  backgroundColor: inputBackgroundColor,
+                  borderColor: passwordError ? '#ff4444' : inputBorderColor,
+                }
+              ]}>
+                <TextInput
+                  style={[
+                    styles.passwordInput,
+                    { color: textColor }
+                  ]}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (passwordError) setPasswordError(''); // Clear error when user types
+                  }}
+                  placeholder="Enter your password"
+                  placeholderTextColor={subtextColor}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.eyeIconText, { color: subtextColor }]}>
+                    {showPassword ? '🙈' : '👁'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
             </View>
 
@@ -464,6 +529,28 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#cccccc',
     opacity: 0.6,
+  },
+  passwordInputContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 50,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
+  eyeIcon: {
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIconText: {
+    fontSize: 20,
   },
 });
 

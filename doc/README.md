@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-ReactAuthExample is a React Native CLI application created as a starting point for mobile app development. The application demonstrates a clean welcome screen architecture with synchronized version management across iOS and Android platforms.
+ReactAuthExample is a React Native CLI application featuring a complete authentication system with backend integration. The application demonstrates modern mobile app development practices including secure authentication, persistent user preferences, and professional UI/UX design.
 
 ## Features
 
@@ -16,6 +16,22 @@ ReactAuthExample is a React Native CLI application created as a starting point f
 - **Version Display**: Shows current app version and build number
 - **Synchronized Information**: Version data is pulled from centralized configuration
 - **Native Implementation**: Uses React Native's Alert API for native feel
+
+### ✅ Authentication System
+- **Login Form**: Email and password authentication with real-time validation
+- **API Integration**: Full backend integration with PHP/MySQL authentication
+- **Password Security**: Show/hide password toggle with eye icon for better UX
+- **Email Persistence**: Automatic email caching across app sessions using AsyncStorage
+- **Loading States**: Visual feedback during authentication requests
+- **Error Handling**: Comprehensive validation and network error management
+- **Form Validation**: Client-side email format and password complexity validation
+
+### ✅ Backend Integration
+- **PHP API**: Complete REST API with login, register, and test endpoints
+- **MySQL Database**: User management with secure password hashing
+- **MAMP Deployment**: Ready-to-deploy MAMP server configuration
+- **Sample Users**: Pre-configured test accounts for immediate testing
+- **CORS Support**: Cross-origin configuration for React Native requests
 
 ### ✅ Version Synchronization
 - **Centralized Configuration**: Single source of truth for version information
@@ -49,7 +65,10 @@ ReactAuthExample/
   - TouchableOpacity for button interactions
   - Alert for native dialogs
   - useColorScheme for theme detection
-- **State Management**: React hooks for simple state handling
+  - AsyncStorage for persistent email caching
+- **State Management**: React hooks for authentication and form handling
+- **API Integration**: Fetch-based HTTP requests to PHP backend
+- **UX Features**: Password show/hide toggle, loading states, cached email
 
 ### Version Management
 The application uses a centralized version management system:
@@ -97,6 +116,16 @@ The application uses a centralized version management system:
    bundle exec pod install
    cd ..
    ```
+
+4. **Backend Setup** (Optional - for authentication testing):
+   - Follow instructions in `php-api/MAMP-SETUP.md`
+   - Set up MAMP server with MySQL database
+   - Deploy PHP API endpoints
+
+### Key Dependencies
+- **React Native**: 0.73.6
+- **@react-native-async-storage/async-storage**: ^2.2.0 - Email persistence
+- **PHP/MySQL Backend**: Complete authentication API
 
 ## Usage
 
