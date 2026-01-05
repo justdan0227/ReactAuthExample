@@ -34,7 +34,15 @@ A complete React Native CLI application demonstrating **JWT authentication** wit
 1. **Start MAMP** with document root: `/Users/d0k08gm/Projects/mamp`
 2. **Copy API files**: `cp -r php-api /Users/d0k08gm/Projects/mamp/reactauth-api`
 3. **Create database**: Import `php-api/database/schema.sql` into `reactauth_example` database
-4. **Test API**: Visit `http://localhost:8888/reactauth-api/api/test.php`
+4. **Import emergency features**: `mysql -u root -proot --port=8889 --host=127.0.0.1 reactauth_example < php-api/database/immediate_revocation.sql`
+5. **Test API**: Visit `http://localhost:8888/reactauth-api/api/test.php`
+
+**IMPORTANT:** Always copy updated PHP files to MAMP after changes:
+```bash
+cp php-api/config/*.php /Users/d0k08gm/Projects/mamp/reactauth-api/config/
+cp php-api/api/*.php /Users/d0k08gm/Projects/mamp/reactauth-api/api/
+cp php-api/.htaccess /Users/d0k08gm/Projects/mamp/reactauth-api/.htaccess
+```
 
 ### React Native Setup
 
@@ -120,9 +128,67 @@ npx react-native run-android
 ✅ **Database-stored refresh tokens with revocation**  
 ✅ **Protected API endpoints working**  
 ✅ **Dashboard UI with user information**  
-✅ **Secure logout with server-side token cleanup**
+✅ **Secure logout with server-side token cleanup**  
+✅ **Apache authorization header support (.htaccess)**  
+✅ **Fixed JWT secret consistency issue**  
+✅ **Emergency lockout system with immediate user control**  
+✅ **Enhanced authentication middleware**  
+✅ **Terminal-based user management scripts**
 
 **Token System**: 1-hour access tokens + 7-day refresh tokens
+
+## 🚨 Emergency User Control
+
+**New security features for immediate user lockout:**
+
+### Database Schema
+```bash
+# Import emergency lockout tables
+mysql -u root -proot --port=8889 --host=127.0.0.1 reactauth_example < php-api/database/immediate_revocation.sql
+```
+
+### Terminal Commands
+```bash
+# Emergency lockout (immediate effect on next API call)
+./php-api/scripts/emergency_lockout.sh emergency-lockout <user_id> "reason"
+
+# Terminate all user sessions (forced re-login after token expiry)  
+./php-api/scripts/emergency_lockout.sh terminate-sessions <user_id> "reason"
+
+# Check user status and active sessions
+./php-api/scripts/emergency_lockout.sh check-status <user_id>
+
+# List all users with current status
+./php-api/scripts/emergency_lockout.sh list-users
+
+# Unlock user
+./php-api/scripts/emergency_lockout.sh unlock <user_id>
+```
+
+### Direct Database Control
+```sql
+-- Emergency lockout (immediate effect)
+UPDATE users SET is_locked_out = 1 WHERE email = 'user@example.com';
+
+-- Revoke all refresh tokens (forced re-login)
+UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = 1;
+```
+
+## 🔧 Technical Fixes Applied
+
+### Apache Configuration
+- **Added `.htaccess`** - Fixes Authorization header not reaching PHP
+- **CORS support** - Proper handling for React Native requests
+
+### JWT Authentication  
+- **Fixed JWT secret consistency** - Removed `time()` from secret generation
+- **Enhanced token validation** - Better error handling and debugging
+- **Immediate revocation support** - Server-side token blacklisting
+
+### Database Enhancements
+- **`revoked_access_tokens`** - Immediate access token revocation
+- **`user_sessions`** - Session tracking and management  
+- **Emergency lockout flags** - Instant user access control
 
 ---
 

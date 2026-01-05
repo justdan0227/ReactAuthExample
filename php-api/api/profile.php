@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // Validate JWT token
+    // Validate JWT token (using original auth for now)
     $auth = new AuthMiddleware();
     $userData = $auth->requireAuth();
     

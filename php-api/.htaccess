@@ -1,0 +1,2 @@
+# Allow Authorization header to be passed to PHP
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1

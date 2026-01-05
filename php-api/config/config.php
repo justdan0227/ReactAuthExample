@@ -16,8 +16,8 @@ define('API_DEBUG', true); // Set to false in production
 define('API_VERSION', '1.0');
 
 // Security configuration
-define('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production-' . time()); // Change this!
-define('JWT_EXPIRATION', 5); // 5 seconds for testing
+define('JWT_SECRET', 'your-super-secret-jwt-key-change-in-production-fixed-secret'); // Fixed secret for consistent validation
+define('JWT_EXPIRATION', 3600); // 1 hour
 define('PASSWORD_MIN_LENGTH', 8);
 
 // CORS configuration for React Native
