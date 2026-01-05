@@ -25,6 +25,14 @@ import {
 const packageJson = require('./package.json');
 const versionConfig = require('./version.json');
 
+// API Configuration
+const API_BASE_URL = 'http://localhost:8888/reactauth-api/api';
+const API_ENDPOINTS = {
+  login: `${API_BASE_URL}/login.php`,
+  register: `${API_BASE_URL}/register.php`,
+  test: `${API_BASE_URL}/test.php`
+};
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [currentScreen, setCurrentScreen] = useState('welcome'); // 'welcome' or 'login'
@@ -32,6 +40,9 @@ function App() {
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
 
   // Email validation function
   const validateEmail = (email) => {
@@ -63,7 +74,7 @@ function App() {
     );
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let hasErrors = false;
 
     // Reset errors
@@ -96,13 +107,57 @@ function App() {
       }
     }
 
-    // If no errors, show success (for now)
+    // If validation passes, proceed with API call
     if (!hasErrors) {
-      Alert.alert(
-        'Login Validation Success',
-        'All fields are valid! Login functionality will be implemented next.',
-        [{ text: 'OK', style: 'default' }]
-      );
+      setIsLoading(true);
+      
+      try {
+        const response = await fetch(API_ENDPOINTS.login, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Login successful
+          setUser(data.user);
+          setAuthToken(data.token);
+          
+          Alert.alert(
+            'Login Successful!',
+            `Welcome back, ${data.user.first_name}!\n\nUser ID: ${data.user.id}\nEmail: ${data.user.email}`,
+            [{ text: 'OK', style: 'default' }]
+          );
+          
+          // Clear the form
+          setEmail('');
+          setPassword('');
+        } else {
+          // API returned an error
+          Alert.alert(
+            'Login Failed',
+            data.error || 'Invalid credentials. Please check your email and password.',
+            [{ text: 'OK', style: 'default' }]
+          );
+        }
+      } catch (error) {
+        // Network or other error
+        console.error('Login error:', error);
+        Alert.alert(
+          'Connection Error',
+          'Unable to connect to the server. Please check your connection and try again.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -258,11 +313,14 @@ function App() {
             </View>
 
             <TouchableOpacity 
-              style={[styles.button, styles.loginButton]}
+              style={[styles.button, styles.loginButton, isLoading && styles.disabledButton]}
               onPress={handleLogin}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
-              <Text style={styles.buttonText}>LOGIN</Text>
+              <Text style={styles.buttonText}>
+                {isLoading ? 'LOGGING IN...' : 'LOGIN'}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -402,6 +460,10 @@ const styles = StyleSheet.create({
     marginTop: 30,
     alignSelf: 'stretch',
     minWidth: 'auto',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.6,
   },
 });
 
