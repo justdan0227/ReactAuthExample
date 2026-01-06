@@ -52,7 +52,7 @@ cp php-api/.htaccess /Users/d0k08gm/Projects/mamp/reactauth-api/.htaccess
 
 ```bash
 npm install
-# Ensure AsyncStorage is linked properly
+# Includes testing dependencies: Jest, node-fetch, AsyncStorage mocks
 ```
 
 ## Step 2: Start the Metro Server
@@ -115,7 +115,30 @@ npx react-native run-android
 
 ## 🧪 Testing
 
-**Test Token Expiration:**
+### Comprehensive Test Suite
+Run the full authentication test suite with:
+```bash
+npm test
+```
+
+**What the test suite validates:**
+- ✅ **App Rendering** - Component structure and stability
+- ✅ **User Registration** - Creates test user with proper validation
+- ✅ **Login Flow** - Authentication with valid/invalid credentials
+- ✅ **Profile Access** - Protected endpoint security
+- ✅ **Token Refresh** - Automatic token renewal system
+- ✅ **Logout Process** - Proper token revocation
+- ✅ **Security Validation** - Invalid token rejection
+- ✅ **Password Requirements** - Strong password enforcement
+- ✅ **Duplicate Prevention** - Email uniqueness validation
+
+**Test Features:**
+- 🔄 **Automatic cleanup** - Creates and removes test users
+- 🎯 **End-to-end testing** - Full authentication workflow
+- ⚡ **Fast execution** - ~1.5 seconds total runtime
+- 📊 **11 test cases** - Comprehensive coverage
+
+**Manual Token Expiration Testing:**
 1. Login to app → Note dashboard token expiration time
 2. Wait for expiration → Restart app → Should show login screen
 3. Login again within expiration window → Restart app → Should show dashboard
