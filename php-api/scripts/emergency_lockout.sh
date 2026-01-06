@@ -95,16 +95,17 @@ EOF
         
     "list-users")
         echo "📋 ALL USERS:"
-        mysql $MYSQL_OPTS $DB_NAME << EOF
+        printf "%-8s%-24s%-16s%-16s%s\n" "ID" "EMAIL" "NAME" "STATUS" "CREATED"
+        mysql $MYSQL_OPTS $DB_NAME -N << EOF
 SELECT 
     id,
     email,
-    CONCAT(first_name, ' ', last_name) as name,
+    CONCAT(first_name, ' ', last_name),
     CASE 
         WHEN is_locked_out = 1 THEN '🔒 LOCKED'
         WHEN is_active = 0 THEN '❌ INACTIVE' 
         ELSE '✅ ACTIVE'
-    END as status,
+    END,
     created_at
 FROM users 
 ORDER BY id;
