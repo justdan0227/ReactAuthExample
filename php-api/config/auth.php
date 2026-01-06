@@ -51,6 +51,21 @@ class AuthMiddleware {
         try {
             // Decode and validate token
             $payload = $this->jwt->decode($token);
+            
+            // Check if user is locked out - force fresh read
+            require_once '../config/database.php';
+            $database = new Database();
+            $db = $database->getConnection();
+            
+            // Force a fresh read by using a timestamp hint
+            $stmt = $db->prepare("SELECT is_locked_out, NOW() as check_time FROM users WHERE id = ?");
+            $stmt->execute([$payload['user_id']]);
+            $user = $stmt->fetch();
+            
+            if ($user && $user['is_locked_out'] == 1) {
+                throw new Exception('Account has been locked for security reasons');
+            }
+            
             return $payload;
         } catch (Exception $e) {
             throw new Exception('Invalid or expired token: ' . $e->getMessage());

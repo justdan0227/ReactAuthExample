@@ -44,6 +44,10 @@ try {
     // Initialize JWT
     $jwt = new SimpleJWT(JWT_SECRET);
     
+    // Connect to database
+    $database = new Database();
+    $db = $database->getConnection();
+    
     // Decode and verify refresh token
     $payload = $jwt->decode($refreshToken);
     
@@ -57,7 +61,7 @@ try {
     $userId = $payload['user_id'];
     
     // Check if refresh token exists and is valid in database
-    $stmt = $pdo->prepare("
+    $stmt = $db->prepare("
         SELECT id, expires_at, is_revoked 
         FROM refresh_tokens 
         WHERE token = ? AND user_id = ?
@@ -86,7 +90,7 @@ try {
     }
     
     // Get user data
-    $stmt = $pdo->prepare("SELECT id, email, first_name, last_name FROM users WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, email, first_name, last_name FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
     

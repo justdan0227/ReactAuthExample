@@ -45,20 +45,24 @@ try {
     // Initialize JWT
     $jwt = new SimpleJWT(JWT_SECRET);
     
+    // Connect to database
+    $database = new Database();
+    $db = $database->getConnection();
+    
     // Decode refresh token to get user_id
     $payload = $jwt->decode($refreshToken);
     $userId = $payload['user_id'];
     
     if ($logoutAll) {
         // Logout from all devices - revoke all refresh tokens for this user
-        $stmt = $pdo->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?");
+        $stmt = $db->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?");
         $stmt->execute([$userId]);
         $revokedCount = $stmt->rowCount();
         
         $message = "Logged out from all devices ($revokedCount tokens revoked)";
     } else {
         // Logout from current device only - revoke this specific refresh token
-        $stmt = $pdo->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ?");
+        $stmt = $db->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ?");
         $stmt->execute([$refreshToken, $userId]);
         $revokedCount = $stmt->rowCount();
         

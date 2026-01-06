@@ -540,11 +540,14 @@ function App() {
       
       if (data.success) {
         setProfileData(data);
+        Alert.alert('Success', 'Profile data fetched successfully!');
       } else {
+        setProfileData(null);
         Alert.alert('Error', 'Failed to fetch profile data');
       }
     } catch (error) {
       console.log('Error fetching profile:', error);
+      setProfileData(null);
       Alert.alert('Error', 'Failed to fetch profile data');
     } finally {
       setIsLoading(false);
