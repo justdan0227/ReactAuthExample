@@ -118,19 +118,26 @@ EOF
             exit 1
         fi
         
-        echo "🔍 USER STATUS: User $USER_EMAIL"
-        mysql $MYSQL_OPTS $DB_NAME << EOF
+        echo "🔍 USER STATUS: $USER_EMAIL"
+        echo ""
+        printf "%-8s%-24s%-16s%s\n" "ID" "EMAIL" "NAME" "STATUS"
+        printf "%-8s%-24s%-16s%s\n" "---" "-----" "----" "------"
+        mysql $MYSQL_OPTS $DB_NAME -N << EOF
 SELECT 
     id,
     email,
-    CONCAT(first_name, ' ', last_name) as name,
+    CONCAT(first_name, ' ', last_name),
     CASE 
-        WHEN is_locked_out = 1 THEN '🔒 EMERGENCY LOCKED OUT'
-        WHEN is_active = 0 THEN '❌ ACCOUNT INACTIVE' 
-        ELSE '✅ ACCOUNT ACTIVE'
-    END as status
+        WHEN is_locked_out = 1 THEN '🔒 LOCKED'
+        WHEN is_active = 0 THEN '❌ INACTIVE' 
+        ELSE '✅ ACTIVE'
+    END
 FROM users WHERE email = '$USER_EMAIL';
+EOF
 
+        echo ""
+        echo "📊 SESSION DETAILS:"
+        mysql $MYSQL_OPTS $DB_NAME << EOF
 SELECT CONCAT('🔄 Active refresh tokens: ', COUNT(*)) as refresh_tokens
 FROM refresh_tokens WHERE user_id = (SELECT id FROM users WHERE email = '$USER_EMAIL') AND is_revoked = FALSE;
 

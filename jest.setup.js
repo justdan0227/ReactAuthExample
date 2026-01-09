@@ -2,9 +2,20 @@
  * Jest setup file for React Native tests
  */
 
-// Mock AsyncStorage
-import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
+// Mock Keychain
+jest.mock('react-native-keychain', () => ({
+  setInternetCredentials: jest.fn(() => Promise.resolve()),
+  getInternetCredentials: jest.fn((key) => {
+    if (key === 'userData') {
+      return Promise.resolve({ username: 'data', password: '{"user_id":1,"email":"test@example.com","name":"Test User"}' });
+    }
+    if (key === 'userEmail') {
+      return Promise.resolve({ username: 'test@example.com', password: 'cached' });
+    }
+    return Promise.resolve({ username: 'token', password: 'test-token' });
+  }),
+  resetInternetCredentials: jest.fn(() => Promise.resolve()),
+}));
 
 // Enable fetch for Node.js environment (for integration tests)
 global.fetch = require('node-fetch');

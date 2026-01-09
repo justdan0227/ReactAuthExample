@@ -68,6 +68,14 @@ npm start
 npx react-native run-ios
 ```
 
+**iOS Simulator Startup (if needed):**
+```bash
+# Always do this 3-step dance:
+xcrun simctl shutdown all  # or shutdown specific UUIDs
+xcrun simctl boot "CE793E05-BC47-440C-ADFE-424976D08354" 
+yarn run:ios --device "CE793E05-BC47-440C-ADFE-424976D08354"
+```
+
 ### For Android  
 ```bash
 npx react-native run-android
@@ -173,34 +181,34 @@ mysql -u root -proot --port=8889 --host=127.0.0.1 reactauth_example < php-api/da
 ### Terminal Commands
 ```bash
 # Emergency lockout (immediate effect on next API call)
-./php-api/scripts/emergency_lockout.sh emergency-lockout user@example.com "reason"
+./php-api/scripts/token_util.sh emergency-lockout user@example.com "reason"
 
 # Terminate all user sessions (forced re-login after token expiry)  
-./php-api/scripts/emergency_lockout.sh terminate-sessions user@example.com "reason"
+./php-api/scripts/token_util.sh terminate-sessions user@example.com "reason"
 
 # Check user status and active sessions
-./php-api/scripts/emergency_lockout.sh check-status user@example.com
+./php-api/scripts/token_util.sh check-status user@example.com
 
 # List all users with current status
-./php-api/scripts/emergency_lockout.sh list-users
+./php-api/scripts/token_util.sh list-users
 
 # Unlock user
-./php-api/scripts/emergency_lockout.sh unlock user@example.com
+./php-api/scripts/token_util.sh unlock user@example.com
 ```
 
 ### 🎯 Testing Emergency Lockout
 ```bash
 # 1. Lock out john@example.com
-./php-api/scripts/emergency_lockout.sh emergency-lockout john@example.com
+./php-api/scripts/token_util.sh emergency-lockout john@example.com
 
 # 2. List all users with their lockout status  
-./php-api/scripts/emergency_lockout.sh list-users
+./php-api/scripts/token_util.sh list-users
 
 # 3. Check specific user status (optional)
-./php-api/scripts/emergency_lockout.sh check-status john@example.com
+./php-api/scripts/token_util.sh check-status john@example.com
 
 # 4. Re-enable john@example.com
-./php-api/scripts/emergency_lockout.sh unlock john@example.com
+./php-api/scripts/token_util.sh unlock john@example.com
 ```
 
 **Test Flow:**

@@ -20,7 +20,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Keychain from 'react-native-keychain';
 
 // Import version from configuration files
 const packageJson = require('./package.json');
@@ -141,8 +141,8 @@ function App() {
         setTokenExpiration(newExpiration);
         
         // Update stored auth data
-        await AsyncStorage.setItem('authToken', data.access_token);
-        await AsyncStorage.setItem('tokenExpiration', newExpiration.toString());
+        await Keychain.setInternetCredentials('authToken', 'token', data.access_token);
+        await Keychain.setInternetCredentials('tokenExpiration', 'expiration', newExpiration.toString());
         
         console.log('New access token saved, expires:', new Date(newExpiration));
         return true;
@@ -165,14 +165,14 @@ function App() {
     try {
       console.log('loadCachedData: Starting...');
       
-      // Check if AsyncStorage is available
-      if (!AsyncStorage) {
-        console.log('AsyncStorage not available');
-        return;
-      }
-      
       // Load cached email
-      const cachedEmail = await AsyncStorage.getItem('userEmail');
+      let cachedEmail = null;
+      try {
+        const emailCredentials = await Keychain.getInternetCredentials('userEmail');
+        cachedEmail = emailCredentials ? emailCredentials.username : null;
+      } catch (error) {
+        console.log('No cached email found');
+      }
       console.log('loadCachedData: Retrieved email from cache:', cachedEmail);
       
       if (cachedEmail) {
@@ -181,10 +181,38 @@ function App() {
       }
       
       // Load cached tokens and user data
-      const cachedAccessToken = await AsyncStorage.getItem('authToken');
-      const cachedRefreshToken = await AsyncStorage.getItem('refreshToken');
-      const cachedUser = await AsyncStorage.getItem('userData');
-      const cachedExpiration = await AsyncStorage.getItem('tokenExpiration');
+      let cachedAccessToken = null;
+      let cachedRefreshToken = null;
+      let cachedUser = null;
+      let cachedExpiration = null;
+      
+      try {
+        const accessTokenCredentials = await Keychain.getInternetCredentials('authToken');
+        cachedAccessToken = accessTokenCredentials ? accessTokenCredentials.password : null;
+      } catch (error) {
+        console.log('No access token found');
+      }
+      
+      try {
+        const refreshTokenCredentials = await Keychain.getInternetCredentials('refreshToken');
+        cachedRefreshToken = refreshTokenCredentials ? refreshTokenCredentials.password : null;
+      } catch (error) {
+        console.log('No refresh token found');
+      }
+      
+      try {
+        const userDataCredentials = await Keychain.getInternetCredentials('userData');
+        cachedUser = userDataCredentials ? userDataCredentials.password : null;
+      } catch (error) {
+        console.log('No user data found');
+      }
+      
+      try {
+        const expirationCredentials = await Keychain.getInternetCredentials('tokenExpiration');
+        cachedExpiration = expirationCredentials ? expirationCredentials.password : null;
+      } catch (error) {
+        console.log('No expiration data found');
+      }
       
       console.log('loadCachedData: Access token found:', !!cachedAccessToken);
       console.log('loadCachedData: Refresh token found:', !!cachedRefreshToken);
@@ -227,21 +255,16 @@ function App() {
 
   const saveAuthData = async (accessToken, refreshTokenValue, userData, expiresIn) => {
     try {
-      if (!AsyncStorage) {
-        console.log('AsyncStorage not available for saving auth data');
-        return;
-      }
-      
       console.log('saveAuthData: expiresIn received:', expiresIn);
       const expirationTime = Date.now() + (expiresIn * 1000);
       console.log('saveAuthData: calculated expiration time:', new Date(expirationTime));
       
-      await AsyncStorage.setItem('authToken', accessToken);
+      await Keychain.setInternetCredentials('authToken', 'token', accessToken);
       if (refreshTokenValue) {
-        await AsyncStorage.setItem('refreshToken', refreshTokenValue);
+        await Keychain.setInternetCredentials('refreshToken', 'token', refreshTokenValue);
       }
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      await AsyncStorage.setItem('tokenExpiration', expirationTime.toString());
+      await Keychain.setInternetCredentials('userData', 'data', JSON.stringify(userData));
+      await Keychain.setInternetCredentials('tokenExpiration', 'expiration', expirationTime.toString());
       
       setAuthToken(accessToken);
       if (refreshTokenValue) {
@@ -258,18 +281,13 @@ function App() {
 
   const saveAuthDataLegacy = async (token, userData, expiresIn) => {
     try {
-      if (!AsyncStorage) {
-        console.log('AsyncStorage not available for saving auth data');
-        return;
-      }
-      
       console.log('saveAuthDataLegacy: expiresIn received:', expiresIn);
       const expirationTime = Date.now() + (expiresIn * 1000);
       console.log('saveAuthDataLegacy: calculated expiration time:', new Date(expirationTime));
       
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      await AsyncStorage.setItem('tokenExpiration', expirationTime.toString());
+      await Keychain.setInternetCredentials('authToken', 'token', token);
+      await Keychain.setInternetCredentials('userData', 'data', JSON.stringify(userData));
+      await Keychain.setInternetCredentials('tokenExpiration', 'expiration', expirationTime.toString());
       
       setAuthToken(token);
       setUser(userData);
@@ -283,12 +301,10 @@ function App() {
 
   const clearAuthData = async () => {
     try {
-      if (!AsyncStorage) {
-        console.log('AsyncStorage not available for clearing auth data');
-        return;
-      }
-      
-      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'userData', 'tokenExpiration']);
+      await Keychain.resetInternetCredentials('authToken');
+      await Keychain.resetInternetCredentials('refreshToken');
+      await Keychain.resetInternetCredentials('userData');
+      await Keychain.resetInternetCredentials('tokenExpiration');
       
       setAuthToken(null);
       setRefreshToken(null);
@@ -305,13 +321,7 @@ function App() {
     try {
       console.log('saveCachedEmail: Saving email:', emailToSave);
       
-      // Check if AsyncStorage is available
-      if (!AsyncStorage) {
-        console.log('AsyncStorage not available for saving');
-        return;
-      }
-      
-      await AsyncStorage.setItem('userEmail', emailToSave);
+      await Keychain.setInternetCredentials('userEmail', emailToSave, 'cached');
       console.log('saveCachedEmail: Email saved successfully');
     } catch (error) {
       console.log('Error saving email:', error);
