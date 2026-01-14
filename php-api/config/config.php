@@ -25,6 +25,7 @@ define('ALLOWED_ORIGINS', [
     'http://localhost:8081', // Metro bundler
     'http://localhost:19006', // Expo dev server (if needed)
     'http://10.0.2.2:8081', // Android emulator
+    'http://localhost:5173', // Vite (React web)
 ]);
 
 // Error reporting (disable in production)

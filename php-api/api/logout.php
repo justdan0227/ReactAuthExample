@@ -41,6 +41,7 @@ try {
 
     $refreshToken = $input['refresh_token'];
     $logoutAll = $input['logout_all'] ?? false; // Optional: logout from all devices
+    $sessionId = $input['session_id'] ?? null; // Optional: deactivate a specific tracked session
     
     // Initialize JWT
     $jwt = new SimpleJWT(JWT_SECRET);
@@ -50,14 +51,55 @@ try {
     $db = $database->getConnection();
     
     // Decode refresh token to get user_id
-    $payload = $jwt->decode($refreshToken);
-    $userId = $payload['user_id'];
+    // Note: if decoding fails, fall back to DB lookup so logout can remain idempotent.
+    $userId = null;
+    try {
+        $payload = $jwt->decode($refreshToken);
+        $userId = $payload['user_id'] ?? null;
+    } catch (Exception $e) {
+        $userId = null;
+    }
+
+    if (!$userId) {
+        try {
+            $stmt = $db->prepare("SELECT user_id FROM refresh_tokens WHERE token = ? LIMIT 1");
+            $stmt->execute([$refreshToken]);
+            $row = $stmt->fetch();
+            if ($row && isset($row['user_id'])) {
+                $userId = (int)$row['user_id'];
+            }
+        } catch (Exception $e) {
+            error_log('Failed to resolve user_id from refresh token: ' . $e->getMessage());
+        }
+    }
+
+    if (!$userId) {
+        // If we can't tie this refresh token to a user, treat logout as a no-op.
+        http_response_code(200);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Logged out successfully'
+        ]);
+        exit();
+    }
     
     if ($logoutAll) {
         // Logout from all devices - revoke all refresh tokens for this user
         $stmt = $db->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?");
         $stmt->execute([$userId]);
         $revokedCount = $stmt->rowCount();
+
+        // Also deactivate all user sessions when available
+        try {
+            $hasSessionsStmt = $db->query("SHOW TABLES LIKE 'user_sessions'");
+            $hasSessions = (bool)($hasSessionsStmt && $hasSessionsStmt->fetch());
+            if ($hasSessions) {
+                $stmt = $db->prepare("UPDATE user_sessions SET is_active = 0 WHERE user_id = ?");
+                $stmt->execute([$userId]);
+            }
+        } catch (Exception $e) {
+            error_log('Failed to deactivate user sessions (logout_all): ' . $e->getMessage());
+        }
         
         $message = "Logged out from all devices ($revokedCount tokens revoked)";
     } else {
@@ -65,14 +107,23 @@ try {
         $stmt = $db->prepare("UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = ? AND user_id = ?");
         $stmt->execute([$refreshToken, $userId]);
         $revokedCount = $stmt->rowCount();
-        
-        if ($revokedCount === 0) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Refresh token not found']);
-            exit();
+
+        // Make logout idempotent: if the token was already revoked/missing, still return success.
+        $message = $revokedCount === 0 ? 'Already logged out' : 'Logged out successfully';
+
+        // If the client provided a session_id, deactivate that tracked session when available
+        if ($sessionId) {
+            try {
+                $hasSessionsStmt = $db->query("SHOW TABLES LIKE 'user_sessions'");
+                $hasSessions = (bool)($hasSessionsStmt && $hasSessionsStmt->fetch());
+                if ($hasSessions) {
+                    $stmt = $db->prepare("UPDATE user_sessions SET is_active = 0 WHERE user_id = ? AND session_id = ?");
+                    $stmt->execute([$userId, $sessionId]);
+                }
+            } catch (Exception $e) {
+                error_log('Failed to deactivate user session (logout): ' . $e->getMessage());
+            }
         }
-        
-        $message = "Logged out successfully";
     }
     
     // Return success response
@@ -97,15 +148,8 @@ try {
  */
 function setCorsHeaders() {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    
-    // Allow requests from React Native Metro bundler and common development ports
-    $allowedOrigins = [
-        'http://localhost:8081', // Metro bundler
-        'http://localhost:19006', // Expo dev server (if needed)
-        'http://10.0.2.2:8081', // Android emulator
-    ];
-    
-    if (in_array($origin, $allowedOrigins)) {
+
+    if (in_array($origin, ALLOWED_ORIGINS)) {
         header("Access-Control-Allow-Origin: $origin");
     }
     

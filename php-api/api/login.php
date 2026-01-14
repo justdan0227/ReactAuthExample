@@ -58,7 +58,7 @@ try {
     $db = $database->getConnection();
 
     // Find user by email
-    $query = "SELECT id, email, password_hash, first_name, last_name, is_active FROM users WHERE email = ? AND is_active = 1";
+    $query = "SELECT id, email, password_hash, first_name, last_name, is_active, is_locked_out FROM users WHERE email = ? AND is_active = 1";
     $stmt = $db->prepare($query);
     $stmt->execute([$email]);
     $user = $stmt->fetch();
@@ -66,6 +66,13 @@ try {
     if (!$user) {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid credentials']);
+        exit();
+    }
+
+    // Block login immediately when a user is locked out
+    if (!empty($user['is_locked_out'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Account has been locked for security reasons']);
         exit();
     }
 
@@ -80,6 +87,27 @@ try {
     $updateQuery = "UPDATE users SET last_login = NOW() WHERE id = ?";
     $updateStmt = $db->prepare($updateQuery);
     $updateStmt->execute([$user['id']]);
+
+    // Create a user session record if user_sessions is available (enhanced revocation system)
+    $sessionId = null;
+    try {
+        $hasSessionsStmt = $db->query("SHOW TABLES LIKE 'user_sessions'");
+        $hasSessions = (bool)($hasSessionsStmt && $hasSessionsStmt->fetch());
+
+        if ($hasSessions) {
+            $sessionId = bin2hex(random_bytes(16));
+            $deviceInfo = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+
+            $stmt = $db->prepare(
+                "INSERT INTO user_sessions (user_id, session_id, device_info, ip_address, is_active) VALUES (?, ?, ?, ?, 1)"
+            );
+            $stmt->execute([$user['id'], $sessionId, $deviceInfo, $ipAddress]);
+        }
+    } catch (Exception $e) {
+        // Session tracking is optional; don't block login if it fails.
+        error_log('Failed to create user session: ' . $e->getMessage());
+    }
 
     // Generate JWT token
     $jwt = new SimpleJWT(JWT_SECRET);
@@ -129,6 +157,10 @@ try {
         'expires_in' => 3600,
         'token_type' => 'Bearer'
     ];
+
+    if ($sessionId) {
+        $response['session_id'] = $sessionId;
+    }
     
     // Only include refresh token if successfully stored
     if ($refreshTokenStored) {

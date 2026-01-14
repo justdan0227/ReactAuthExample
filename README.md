@@ -31,17 +31,17 @@ A complete React Native CLI application demonstrating **JWT authentication** wit
 - iPhone/Android simulator
 
 ### Backend Setup (MAMP)
-1. **Start MAMP** with document root: `/Users/d0k08gm/Projects/mamp`
-2. **Copy API files**: `cp -r php-api /Users/d0k08gm/Projects/mamp/reactauth-api`
+1. **Start MAMP** with document root: `/Users/dankardell/Projects/mamp`
+2. **Copy API files**: `cp -r php-api /Users/dankardell/Projects/mamp/reactauth-api`
 3. **Create database**: Import `php-api/database/schema.sql` into `reactauth_example` database
 4. **Import emergency features**: `mysql -u root -proot --port=8889 --host=127.0.0.1 reactauth_example < php-api/database/immediate_revocation.sql`
 5. **Test API**: Visit `http://localhost:8888/reactauth-api/api/test.php`
 
 **IMPORTANT:** Always copy updated PHP files to MAMP after changes:
 ```bash
-cp php-api/config/*.php /Users/d0k08gm/Projects/mamp/reactauth-api/config/
-cp php-api/api/*.php /Users/d0k08gm/Projects/mamp/reactauth-api/api/
-cp php-api/.htaccess /Users/d0k08gm/Projects/mamp/reactauth-api/.htaccess
+cp php-api/config/*.php /Users/dankardell/Projects/mamp/reactauth-api/config/
+cp php-api/api/*.php /Users/dankardell/Projects/mamp/reactauth-api/api/
+cp php-api/.htaccess /Users/dankardell/Projects/mamp/reactauth-api/.htaccess
 ```
 
 ### React Native Setup
@@ -70,11 +70,21 @@ npx react-native run-ios
 
 **iOS Simulator Startup (if needed):**
 ```bash
-# Always do this 3-step dance:
-xcrun simctl shutdown all  # or shutdown specific UUIDs
-xcrun simctl boot "CE793E05-BC47-440C-ADFE-424976D08354" 
-yarn run:ios --device "CE793E05-BC47-440C-ADFE-424976D08354"
+# 1. Find the UDID for your desired simulator (e.g., iPhone 17 Pro Max on iOS 26):
+xcrun simctl list devices available | grep "iPhone 17 Pro Max"
+# Example output: iPhone 17 Pro Max (ABCD1234-5678-90EF-GHIJ-KLMNOPQRSTUV) (Shutdown)
+
+# 2. Shutdown all simulators:
+xcrun simctl shutdown all
+
+# 3. Boot your chosen simulator (replace <UDID> with actual value from step 1):
+xcrun simctl boot "<UDID>"
+
+# 4. Run the app on that simulator (Metro must be running separately):
+npx react-native run-ios --udid "<UDID>" --no-packager
 ```
+
+> **Tip:** If the simulator runtime or device type is missing, open **Xcode → Settings → Platforms** and install the iOS Simulator runtime you need.
 
 ### For Android  
 ```bash
@@ -105,7 +115,7 @@ npx react-native run-android
 
 2. Copy to MAMP server:
    ```bash
-   cp php-api/api/login.php /Users/d0k08gm/Projects/mamp/reactauth-api/api/login.php
+   cp php-api/api/login.php /Users/dankardell/Projects/mamp/reactauth-api/api/login.php
    ```
 
 **Current Settings:**

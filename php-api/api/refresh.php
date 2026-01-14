@@ -90,13 +90,20 @@ try {
     }
     
     // Get user data
-    $stmt = $db->prepare("SELECT id, email, first_name, last_name FROM users WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, email, first_name, last_name, is_locked_out FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
     
     if (!$user) {
         http_response_code(401);
         echo json_encode(['error' => 'User not found']);
+        exit();
+    }
+
+    // Block refresh immediately when a user is locked out
+    if (!empty($user['is_locked_out'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Account has been locked for security reasons']);
         exit();
     }
     
@@ -131,15 +138,8 @@ try {
  */
 function setCorsHeaders() {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    
-    // Allow requests from React Native Metro bundler and common development ports
-    $allowedOrigins = [
-        'http://localhost:8081', // Metro bundler
-        'http://localhost:19006', // Expo dev server (if needed)
-        'http://10.0.2.2:8081', // Android emulator
-    ];
-    
-    if (in_array($origin, $allowedOrigins)) {
+
+    if (in_array($origin, ALLOWED_ORIGINS)) {
         header("Access-Control-Allow-Origin: $origin");
     }
     
