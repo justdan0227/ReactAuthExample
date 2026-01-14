@@ -27,7 +27,9 @@ const packageJson = require('./package.json');
 const versionConfig = require('./version.json');
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:8888/reactauth-api/api';
+const API_BASE_URL_LOCAL = 'http://localhost:8888/reactauth-api/api';
+const API_BASE_URL_PROD = 'https://www.iclassicnu.com/reactauth-api/api';
+const API_BASE_URL = __DEV__ ? API_BASE_URL_LOCAL : API_BASE_URL_PROD;
 const API_ENDPOINTS = {
   login: `${API_BASE_URL}/login.php`,
   register: `${API_BASE_URL}/register.php`,

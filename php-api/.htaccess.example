@@ -1,0 +1,39 @@
+# Example Apache config for deploying the PHP API under a subfolder.
+# Copy to ".htaccess" in your deployed folder if Hostinger uses Apache.
+
+Options -Indexes
+
+# Deny direct access to non-public folders/files
+<IfModule mod_authz_core.c>
+  <DirectoryMatch "(^|/)(config|database|scripts|src)(/|$)">
+    Require all denied
+  </DirectoryMatch>
+
+  <FilesMatch "^(composer\.(json|lock)|\.env|\.env\..+)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+  <DirectoryMatch "(^|/)(config|database|scripts|src)(/|$)">
+    Order allow,deny
+    Deny from all
+  </DirectoryMatch>
+
+  <FilesMatch "^(composer\.(json|lock)|\.env|\.env\..+)$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
+
+# OPTIONAL: if your host supports SetEnv, you can configure production here.
+# NEVER commit secrets into git; do this only on the server.
+# SetEnv APP_ENV production
+# SetEnv API_DEBUG false
+# SetEnv DB_HOST localhost
+# SetEnv DB_PORT 3306
+# SetEnv DB_NAME your_db
+# SetEnv DB_USER your_user
+# SetEnv DB_PASS your_password
+# SetEnv JWT_SECRET your_long_random_secret
+# SetEnv ALLOWED_ORIGINS "https://www.iclassicnu.com,https://iclassicnu.com"
