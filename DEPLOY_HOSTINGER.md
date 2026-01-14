@@ -6,15 +6,10 @@ This repo currently runs locally via MAMP:
 
 This guide deploys the PHP API to your WordPress hosting so mobile/web can point to production.
 
-## Recommended URL layout
+## Target URL layout (chosen)
 
-Option A (recommended): subdomain
-- `https://api.iclassicnu.com/` → points to its own folder (clean separation from WordPress)
-
-Option B: subfolder under WordPress
-- `https://www.iclassicnu.com/reactauth-api/api/` (matches the current local path style)
-
-The code supports either; you just need to set the base URL accordingly.
+We’re deploying as a subfolder under WordPress:
+- `https://www.iclassicnu.com/reactauth-api/api/`
 
 ## 1) Create the folder on Hostinger
 
@@ -33,15 +28,25 @@ From this repo, upload the contents of `php-api/` into that `reactauth-api/` fol
 
 The API uses Composer (`php-api/composer.json`). You must ensure `vendor/` exists on the server.
 
-Two common ways:
+If Hostinger doesn’t give you a shell/Composer, do it locally and upload `vendor/`.
 
-A) If Hostinger provides SSH/Composer:
-- `cd public_html/reactauth-api`
+Local build steps (on your Mac):
+
+- `cd php-api`
+  - moves into the PHP API folder
 - `composer install --no-dev --optimize-autoloader`
+  - creates `php-api/vendor/` with the jwt dependency
 
-B) If no Composer on the server:
-- Run `composer install --no-dev --optimize-autoloader` locally inside `php-api/`
-- Upload the generated `php-api/vendor/` folder to the server.
+Upload steps (Hostinger File Manager):
+
+- Upload the entire `php-api/` contents into `public_html/reactauth-api/`
+  - ensure `vendor/` is included
+
+Tip: it’s usually easier to upload a single zip and extract it in Hostinger’s File Manager.
+
+This repo includes a helper to build that zip after you’ve run Composer locally:
+- `bash scripts/build_hostinger_api_zip.sh`
+  - outputs `reactauth-api-deploy.zip` at the repo root
 
 ## 3) Create the database + import schema
 
