@@ -19,9 +19,17 @@ A complete React Native CLI application demonstrating **JWT authentication** wit
 ## 📱 Architecture
 
 - **Frontend**: React Native 0.73.6 with AsyncStorage for token persistence
+- **Web**: Vite + React app in `web/` for browser testing
 - **Backend**: PHP/MySQL with custom JWT implementation
 - **Server**: MAMP (Apache/MySQL)
 - **Security**: bcrypt password hashing + JWT tokens with configurable expiration
+
+## 📁 Repo Structure (high level)
+
+- React Native app: repo root (this folder)
+- PHP API (source): `php-api/`
+- Web app: `web/`
+- MAMP-served copy (runtime): `/Users/dankardell/Projects/mamp/reactauth-api/`
 
 ## 🔧 Setup Instructions
 
@@ -44,7 +52,37 @@ cp php-api/api/*.php /Users/dankardell/Projects/mamp/reactauth-api/api/
 cp php-api/.htaccess /Users/dankardell/Projects/mamp/reactauth-api/.htaccess
 ```
 
-### React Native Setup
+### Web Setup (Vite)
+
+The `web/` folder is a separate Vite project used to test the same auth flow from a browser.
+
+#### Local dev (recommended: use the Vite proxy)
+
+1) Install web deps:
+```bash
+cd web
+npm install
+```
+
+2) Start the web dev server:
+```bash
+npm run dev
+```
+
+3) Open:
+- `http://localhost:5173`
+
+**Why the proxy matters:** the web app defaults to calling the API via `/api/...` (same-origin).
+Vite proxies `/api` → `http://localhost:8888/reactauth-api/api` (configured in `web/vite.config.ts`).
+This avoids browser CORS issues during local development.
+
+#### Optional: call MAMP directly (requires correct CORS)
+
+Create `web/.env.local`:
+```env
+VITE_API_BASE_URL=http://localhost:8888/reactauth-api/api
+```
+Then ensure the MAMP-served `config/config.php` includes `http://localhost:5173` in `ALLOWED_ORIGINS`.
 
 ### React Native Setup
 
@@ -205,6 +243,11 @@ mysql -u root -proot --port=8889 --host=127.0.0.1 reactauth_example < php-api/da
 # Unlock user
 ./php-api/scripts/token_util.sh unlock user@example.com
 ```
+
+#### Notes
+
+- **Emergency lockout** blocks new logins and refreshes and will cause protected calls (e.g. profile) to fail immediately.
+- Logins create a `user_sessions` row when the table exists and return a `session_id` to help track/deactivate a specific session.
 
 ### 🎯 Testing Emergency Lockout
 ```bash
