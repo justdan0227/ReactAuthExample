@@ -1,19 +1,20 @@
-re# Session Notes (Pick up point)
+## Session Notes (Pick up point)
 
-Date: 2026-01-12
+Date: 2026-01-13
 
 ## Where we are
 
-Goal: get the new `web/` Vite React app talking to the PHP API (MAMP) with the same access-token + refresh-token flow.
+Goal: run the same auth system in three places:
+- React Native (local dev)
+- Vite web app (local dev)
+- Production deployment on Hostinger under WordPress
 
-You confirmed MAMP is serving the API from:
-- `/Applications/MAMP/htdocs/reactauth-api` (Finder screenshot)
+Local dev URLs:
+- Vite dev server: `http://localhost:5173`
+- MAMP API: `http://localhost:8888/reactauth-api/api`
 
-That implies the API base URL (from the browser / Vite) should be:
-- `http://localhost:8888/reactauth-api/api`
-
-Vite dev server runs at:
-- `http://localhost:5173`
+Production target URL layout (chosen):
+- `https://www.iclassicnu.com/reactauth-api/api/`
 
 
 ## What we verified (working)
@@ -46,67 +47,65 @@ ACCESS=$(curl -s -X POST -H 'Origin: http://localhost:5173' -H 'Content-Type: ap
 Result: `HTTP/1.1 200 OK` and profile JSON.
 
 
-## Important caveat (likely next blocker)
+## What changed since the earlier CORS note
 
-In the curl output headers, we did **not** see:
-- `Access-Control-Allow-Origin: http://localhost:5173`
+We avoided local browser CORS entirely by using a Vite dev proxy:
+- Browser calls `http://localhost:5173/api/...`
+- Vite proxies to MAMP at `http://localhost:8888/reactauth-api/api/...`
 
-Curl doesn’t care, but the browser does.
-
-Reason: we edited the PHP files in this repo workspace (`ReactAuthExample/php-api/...`), but MAMP is currently executing the copied version under `/Applications/MAMP/htdocs/reactauth-api/...`.
-
-So the browser may fail until the **MAMP-served copy** has the same CORS allowlist update.
+So local web dev works without needing CORS headers on the MAMP-served copy.
 
 
 ## What code changes were made in THIS repo workspace
 
-Backend CORS updates:
-- Added `http://localhost:5173` to `ALLOWED_ORIGINS` in `php-api/config/config.php`
-- Updated `php-api/api/refresh.php` and `php-api/api/logout.php` to use `ALLOWED_ORIGINS` (they were hard-coded before)
+Web app + proxy:
+- `web/vite.config.ts`: proxies `/api` → `http://localhost:8888/reactauth-api`
+- `web/src/lib/env.ts`: defaults to `'/api'`
 
-Web app added/updated:
-- `web/src/lib/api.ts` – fetch wrapper + login/profile/refresh/logout
-- `web/src/lib/env.ts` – reads `VITE_API_BASE_URL` with a default
-- `web/src/lib/tokens.ts` – localStorage token helpers
-- `web/src/App.tsx` – minimal UI to login + profile + logout
-- `web/.env.example` – example env var
+Backend auth hardening + session tracking:
+- `php-api/api/login.php`: enforces `is_locked_out` + creates `user_sessions` (returns `session_id`)
+- `php-api/api/refresh.php`: enforces `is_locked_out`
+- `php-api/api/logout.php`: supports `session_id`, makes logout idempotent, `logout_all` clears sessions + refresh tokens
+
+Deployment prep (new):
+- `php-api/config/config.php`: now supports env-based config + server-side `config/config.local.php`
+- `App.js`: React Native uses MAMP in dev, production URL in release builds
+- `DEPLOY_HOSTINGER.md`: deployment steps
+- `scripts/build_hostinger_api_zip.sh`: zips deployable PHP API (includes `vendor/`)
 
 
-## Next steps tonight (exact order)
+## End-of-day state
 
-### Step A — Update the MAMP-served copy’s CORS allowlist
-Edit the MAMP-served config file (NOT this repo copy):
-- `/Applications/MAMP/htdocs/reactauth-api/config/config.php`
+- Local web dev works via Vite proxy (`/api`).
+- Local mobile works (tested on iOS simulator).
+- Session tracking + emergency lockout are working and validated via DB.
+- GitHub push succeeded; latest commits are on `main`.
 
-Add this to its `ALLOWED_ORIGINS`:
-- `http://localhost:5173`
+## Pick up tomorrow — Hostinger deployment checklist
 
-Also ensure the MAMP-served `api/refresh.php` and `api/logout.php` use `ALLOWED_ORIGINS` (same change we made in this repo).
+1) On your Mac: build dependencies locally
+- `cd php-api && composer install --no-dev --optimize-autoloader`
 
-Then rerun:
-```bash
-curl -i -H 'Origin: http://localhost:5173' http://localhost:8888/reactauth-api/api/test.php | head -n 40
-```
-You should now see an `Access-Control-Allow-Origin: http://localhost:5173` header.
+2) On your Mac: build a single upload zip
+- `bash scripts/build_hostinger_api_zip.sh`
+  - outputs `reactauth-api-deploy.zip` in the repo root
 
-### Step B — Point Vite to the correct API base URL
-Create `web/.env.local`:
-```env
-VITE_API_BASE_URL=http://localhost:8888/reactauth-api/api
-```
-Restart Vite:
-```bash
-cd web
-npm run dev
-```
+3) On Hostinger: upload + extract
+- Upload `reactauth-api-deploy.zip` to `public_html/`
+- Extract so you get: `public_html/reactauth-api/api/test.php`
 
-### Step C — Validate from the browser
-Open:
-- `http://localhost:5173`
+4) On Hostinger: create MySQL DB + import schema
+- Import SQL from `php-api/database/` (schema + refresh tokens + revocation/session tables)
 
-Use the UI:
-- Click **Login**
-- Click **Get Profile (auto-refresh)**
+5) On Hostinger: production config
+- Create `public_html/reactauth-api/config/config.local.php`
+  - set DB creds + `JWT_SECRET`
+  - optionally set `API_DEBUG=false`
+
+6) Smoke test
+- Visit: `https://www.iclassicnu.com/reactauth-api/api/test.php`
+
+Reference: `DEPLOY_HOSTINGER.md`
 
 
 ## Optional: Refresh-token verification via curl
